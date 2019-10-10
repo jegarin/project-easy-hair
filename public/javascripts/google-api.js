@@ -1,5 +1,7 @@
 let pos;
+let marker;
 let markers = [];
+let map;
 
 function initMap() {
   // Try HTML5 geolocation.
@@ -18,16 +20,11 @@ function initMap() {
       lng: -46.660170,
     };
   }
-
+  
   map = new google.maps.Map(document.getElementById('map'), {
     center: { lat: -23.561682, lng: -46.660170 },
     zoom: 17,
     gestureHandling: 'cooperative',
-    mapTypeControl: true,
-    mapTypeControlOptions: {
-      style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
-      mapTypeIds: ['roadmap', 'satellite'],
-    },
     styles: [
       { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
       { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
@@ -111,29 +108,30 @@ function initMap() {
   });
 }
 
-// former function markCurrentLocation 
+// former function markCurrentLocation
 function setInitialMap() {
   const infoWindow = new google.maps.InfoWindow();
+  marker = new google.maps.Marker({ pos, map });
   infoWindow.setPosition(pos);
   infoWindow.setContent('Você está aqui');
-  infoWindow.open(map);
+  // infoWindow.open(map);
+  addSingleMarker(pos);
   map.setCenter(pos);
 }
 
 async function addSingleMarker(coords, newLocalSearch) {
   deleteMarkers();
 
-  const marker = new google.maps.Marker({
+  marker = new google.maps.Marker({
     position: coords,
     map,
     draggable: true,
     animation: google.maps.Animation.DROP,
-    icon,
+
   });
   map.setCenter(coords);
   markers.push(marker); /* WHY? */
   marker.addListener('click', toggleBounce);
-
 }
 
 function toggleBounce() {
@@ -142,7 +140,7 @@ function toggleBounce() {
   } else {
     marker.setAnimation(google.maps.Animation.BOUNCE);
   }
-}  
+}
 
 function addMarker(places) {
   infoWindow = new google.maps.InfoWindow();
@@ -154,14 +152,11 @@ function addMarker(places) {
 
     contentString[i] = `
     <div class = 'marker-title'>${place.title}</div>
-    <div class = 'marker-category'>${place.vegCategory}</div>
     <div class = 'marker-address'>${place.address}</div>
     `;
     marker[i] = new google.maps.Marker({
       position: place.coord,
       map,
-      // icon:
-      //   'https://res.cloudinary.com/juliaramosguedes/image/upload/v1569094277/project-vegspot/vegflag.png',
     });
 
     marker[i].addListener('mouseover', () => {
@@ -189,13 +184,13 @@ function addMarkerPlaces(places) {
   for (let i = 0; i < places.length; i += 1) {
     const place = places[i];
     const position = place.geometry.location;
-    // console.log(place.name, place.formatted_address);
+    
     contentString[i] = `
     <div>${place.name}</div>
     <div>${place.formatted_address}</div>
     `;
     marker[i] = new google.maps.Marker({
-      position: position,
+      position,
       map,
     });
 
@@ -219,55 +214,44 @@ function addMarkerPlaces(places) {
 function deleteMarkers() {
   if (typeof markers !== 'undefined') {
   // if (markers.length > 0) {
-  for (let i = 0; i < markers.length; i += 1) {
-    markers[i].setMap(null);
-  }
-  markers = [];
+    for (let i = 0; i < markers.length; i += 1) {
+      markers[i].setMap(null);
+    }
+    markers = [];
   }
 }
 
-async function geocode(location) {
-  try {
-    return await axios
-      .get('https://maps.googleapis.com/maps/api/geocode/json', {
-        params: {
-          address: location,
-          key: 'AIzaSyCQpuEpO4UtIbYaCSI_-v9_bBuxOgTMbKw',
-          region: 'br',
-        },
-      });
-  } catch (error) {
-    console.log(error);
-  }
-}
 
 async function findPlaces(text) {
   const request = {
     location: pos,
-    radius: '500',
     query: text,
-    // bounds: 'strictbounds',
-    // type: ['restaurant'],
+ 
   };
   const service = new google.maps.places.PlacesService(map);
   await service.textSearch(request, (places, status) => {
     if (status == google.maps.places.PlacesServiceStatus.OK) {
       addMarkerPlaces(places);
-      document.getElementById('addList').innerHTML = '';
+      document.getElementById('queryResult').innerHTML = '';
       places.forEach((place, index) => {
-        console.log('places', place);
+        
+        // <li class="addPlace">${place.name} ${place.formatted_address}
+        // <input type="hidden" value="${index}">
+        // <button class="fillListButton btn waves-effect waves-light">Adicionar este endereço</button>
+        // </li>
 
-        document.getElementById('addList').innerHTML += `
-        <li class="addPlace">${place.name} ${place.formatted_address} ${place.type}
-        <input type="hidden" value="${index}">
-        <button class="fillListButton btn waves-effect waves-light">Adicionar este endereço</button>
-        </li>
+        document.getElementById('queryResult').innerHTML += `
+        <tr>
+          <td>${place.name}</td>
+          <td>${place.formatted_address}</td>
+          <td class="fillListButton btn waves-effect waves-light" value="${index}">Adicionar</td>  
+        </tr>
         `;
       });
       const addButton = document.querySelectorAll('.fillListButton');
       addButton.forEach((button, index) => {
         button.onclick = function () {
-          // console.log(index);
+          
           placeDetails(places[index].place_id);
           map.setCenter(places[index].geometry.location);
           // addSingleMarker(places[index].geometry.location);
@@ -282,7 +266,6 @@ async function findPlaces(text) {
 function placeDetails(id) {
   const request = {
     placeId: id,
-    // fields: ['name', 'rating', 'formatted_phone_number', 'geometry'],
   };
 
   service = new google.maps.places.PlacesService(map);
@@ -290,30 +273,40 @@ function placeDetails(id) {
 
   function callback(place, status) {
     if (status == google.maps.places.PlacesServiceStatus.OK) {
-      console.log('place details', place);
       const coord = JSON.parse(JSON.stringify(place.geometry.location).toString());
-      console.log('place coord', coord);
       let workTime = '';
-      place.opening_hours.weekday_text.forEach((day) => {
-        workTime += `${day.toString()}\n`;
-      });
-      document.getElementById('clearSelection').innerHTML = `
-      <button id="clearSelectionButton" class="btn btn-info">Limpar Seleção</button>
+      if (typeof (place.opening_hours) !== 'undefined') {
+        place.opening_hours.weekday_text.forEach((day) => {
+          workTime += `${day.toString()}\n`;
+        });
+      } else {
+        workTime += `segunda-feira: 
+terça-feira: 
+quarta-feira:
+quinta-feira:
+sexta-feira:
+sábado:
+domingo:
+        `;
+      }
+      document.getElementById('clearForm').innerHTML = `
+      <p id="clearFormBtn" class="btn">Limpar Cadastro</p>
       `;
-      document.getElementById('clearSelectionButton').onclick = function () {
+      document.getElementById('clearFormBtn').onclick = function () {
         clearFields();
       };
       document.getElementById('saloonName').value = place.name;
-      blockField('saloonName');
-      document.getElementById('contactNumber').value = place.formatted_phone_number;
+      if (typeof (place.formatted_phone_number) === 'undefined') {
+        document.getElementById('contactNumber').value = 'Insira seu telefone';
+      } else {
+        document.getElementById('contactNumber').value = place.formatted_phone_number;
+      }
       document.getElementById('fullAddress').value = place.formatted_address;
-      blockField('fullAddress');
+
       document.getElementById('businessHours').value = workTime;
       document.getElementById('saloonPosition').value = JSON.stringify([coord.lng, coord.lat]);
-      console.log(document.getElementById('saloonPosition').value);
       document.getElementById('placeID').value = place.place_id;
       document.getElementById('ratingFromGoogle').value = place.rating;
-      console.log(typeof (place.photos), typeof (typeof (place.photos)));
       if (typeof (place.photos) !== 'undefined') {
         place.photos.forEach((photo) => {
           document.getElementById('imageGallery').innerHTML += `
@@ -321,10 +314,8 @@ function placeDetails(id) {
           `;
         });
       }
-      console.log(typeof (place.reviews));
       if (typeof (place.reviews) !== 'undefined') {
         place.reviews.forEach((review) => {
-          console.log(review);
           const {
             author_name, rating, relative_time_description, text,
           } = review;
@@ -339,41 +330,21 @@ function placeDetails(id) {
           <input type="hidden" class="reviewsFromGoogleClass" name="reviewsFromGoogle[]" type="text" value="${reviewHeader}">`;
           document.getElementById('reviewsFromGoogle').innerHTML += `
           <input type="hidden" class="reviewsFromGoogleClass" name="reviewsFromGoogleText[]" type="text" value="${reviewText}">`;
-          // console.log(reviewString, typeof (reviewString));
-          console.log(document.getElementById('reviewsFromGoogle'));
         });
       }
     }
   }
 }
 
-function blockField(field) {
-  document.getElementById(field).readOnly = true;
-  document.getElementById(field).classList.add('blocked');
-  document.getElementById(field).onclick = function () {
-    document.getElementById(`blockedField${field}`).innerHTML += `
-    Campo não pode ser alterado. Se quiser cadastrar um local diferente clique em "Limpar Seleção"
-    `;
-  };
-  document.getElementById(field).onfocusout = function () {
-    document.getElementById(`blockedField${field}`).innerHTML = '';
-  };
-}
-
 function clearFields() {
   document.getElementById('saloonName').value = '';
-  document.getElementById('saloonName').readOnly = false;
-  document.getElementById('saloonName').classList.remove('blocked');
-  document.getElementById('saloonName').onclick = '';
   document.getElementById('contactNumber').value = '';
-  document.getElementById('Endereço').value = '';
-  document.getElementById('Endereço').readOnly = false;
-  document.getElementById('Endereço').classList.remove('blocked');
-  document.getElementById('Endereço').onclick = '';
-  document.getElementById('weekday').value = '';
+  document.getElementById('fullAddress').value = '';
+  document.getElementById('businessHours').value = '';
   document.getElementById('saloonPosition').value = '';
   document.getElementById('placeID').value = '';
+  document.getElementById('coverPhoto').value = '';
   document.getElementById('ratingFromGoogle').value = '';
-  document.getElementById('imageGalery').innerHTML = '';
+  document.getElementById('imageGallery').innerHTML = '';
   document.getElementById('reviewsFromGoogle').innerHTML = '';
 }

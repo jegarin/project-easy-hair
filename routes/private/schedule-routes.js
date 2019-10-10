@@ -68,7 +68,30 @@ router.get('/my-schedule', async (req, res) => {
       });
       arrayObject.push(currentObject);
     }
-    res.render('private/my-schedule', { arrayObject });
+
+    let currentDate = [];
+    arrayObject.forEach((element) => {
+      let hour = element.date.getHours();
+      let date = element.date.getDate();
+      let mounth = 1 + element.date.getMonth();
+      let year = element.date.getFullYear(); 
+      let service = element.service;
+      let saloon = element.saloon;
+      let saloonID = element.saloonID;
+
+      currentDateObject = new Object({
+        hour,
+        date,
+        mounth,
+        year,
+        service,
+        saloon,
+        saloonID
+      })
+      currentDate.push(currentDateObject)
+    })
+    
+    res.render('private/my-schedule', { currentDate });
   } catch (error) {
     throw new Error(error);
   }
